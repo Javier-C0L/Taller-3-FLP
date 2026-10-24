@@ -53,3 +53,52 @@
 
 (define scan&parse
   (sllgen:make-string-parser scanner-spec-interpreter grammar-interpreter))
+
+;; 2. DATATYPES Y MANEJO DE AMBIENTES
+
+(define scheme-value? (lambda (v) #t))
+
+(define-datatype ambiente ambiente?
+  (vacio)
+  (extendido
+   (syms (list-of symbol?))
+   (vals (list-of scheme-value?))
+   (amb-padre ambiente?)))
+
+(define empty-env
+  (lambda () (vacio)))
+
+(define extend-env
+  (lambda (syms vals amb)
+    (extendido syms vals amb)))
+
+(define init-env
+  (lambda ()
+    (extend-env '(@a @b @c @d @e)
+                (list 1 2 3 "hola" "FLP")
+                (empty-env))))
+
+(define list-index
+  (lambda (pred ls)
+    (cond
+      ((null? ls) #f)
+      ((pred (car ls)) 0)
+      (else (let ((r (list-index pred (cdr ls))))
+              (if (number? r) (+ r 1) #f))))))
+
+(define list-find-position
+  (lambda (sym los)
+    (list-index (lambda (s) (eqv? s sym)) los)))
+
+(define buscar-variable
+  (lambda (env search-var)
+    (cases ambiente env
+      (vacio ()
+        (eopl:error 'buscar-variable "Error, la variable no existe: ~s" search-var))
+      (extendido (syms vals amb-padre)
+        (let ((pos (list-find-position search-var syms)))
+          (if (number? pos)
+              (list-ref vals pos)
+              (buscar-variable amb-padre search-var)))))))
+
+(define APPLY-ENV buscar-variable)
