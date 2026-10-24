@@ -38,11 +38,18 @@
     (primitive-binary ("*") primitiva-multi)
     (primitive-binary ("%") primitiva-modulo)
     (primitive-binary ("concat") primitiva-concat)
+    (primitive-binary (">") primitiva-mayor)
+    (primitive-binary ("<") primitiva-menor)
+    (primitive-binary (">=") primitiva-mayor-igual)
+    (primitive-binary ("<=") primitiva-menor-igual)
+    (primitive-binary ("!=") primitiva-diferente)
+    (primitive-binary ("==") primitiva-comparador-igual)
 
     ;; Primitivas unarias basicas
     (primitive-unary ("longitud") primitiva-longitud)
     (primitive-unary ("add1") primitiva-add1)
     (primitive-unary ("sub1") primitiva-sub1)
+    (primitive-unary ("neg") primitiva-negacion-booleana)
   ))
 
 (sllgen:make-define-datatypes scanner-spec-interpreter grammar-interpreter)
@@ -102,3 +109,40 @@
               (buscar-variable amb-padre search-var)))))))
 
 (define APPLY-ENV buscar-variable)
+
+
+;; 3. LOGICA BOOLEANA Y EVALUACION DE PRIMITIVAS
+
+(define valor-verdad?
+  (lambda (val)
+    (cond
+      ((number? val) (not (zero? val)))
+      ((boolean? val) val)
+      ((string? val) #t)
+      (else #t))))
+
+(define apply-primitive-binary
+  (lambda (prim val1 val2)
+    (cases primitive-binary prim
+      (primitiva-suma () (+ val1 val2))
+      (primitiva-resta () (- val1 val2))
+      (primitiva-div () (if (and (integer? val1) (integer? val2))
+                            (quotient val1 val2)
+                            (/ val1 val2)))
+      (primitiva-multi () (* val1 val2))
+      (primitiva-modulo () (modulo val1 val2))
+      (primitiva-concat () (string-append val1 val2))
+      (primitiva-mayor () (if (> val1 val2) 1 0))
+      (primitiva-menor () (if (< val1 val2) 1 0))
+      (primitiva-mayor-igual () (if (>= val1 val2) 1 0))
+      (primitiva-menor-igual () (if (<= val1 val2) 1 0))
+      (primitiva-diferente () (if (not (equal? val1 val2)) 1 0))
+      (primitiva-comparador-igual () (if (equal? val1 val2) 1 0)))))
+
+(define apply-primitive-unary
+  (lambda (prim val)
+    (cases primitive-unary prim
+      (primitiva-longitud () (string-length val))
+      (primitiva-add1 () (+ val 1))
+      (primitiva-sub1 () (- val 1))
+      (primitiva-negacion-booleana () (if (valor-verdad? val) 0 1)))))
