@@ -51,9 +51,12 @@
     (primitive-unary ("sub1") primitiva-sub1)
     (primitive-unary ("neg") primitiva-negacion-booleana)
 
-    ;; 4) Condicional if: Si test { true-exp } sino { false-exp } 
+    ;; Condicional if: Si test { true-exp } sino { false-exp } 
     (expression ("Si" expression "{" expression "}" "sino" "{" expression "}") condicional-exp)
   ))
+
+    ;; Variables locales. declarar ( @x=2; @y=3; ) { cuerpo }
+(expression ("declarar" "(" (separated-list identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
 
 (sllgen:make-define-datatypes scanner-spec-interpreter grammar-interpreter)
 
@@ -177,7 +180,13 @@
       (condicional-exp (test-exp true-exp false-exp)
         (if (valor-verdad? (eval-expression test-exp env))
             (eval-expression true-exp env)
-            (eval-expression false-exp env))))))
+            (eval-expression false-exp env)))))) ;; Condicional if (Revisar).
+
+      (variableLocal-exp (ids exps cuerpo) (let ((vals (eval-rands exps env)))
+      (eval-expression cuerpo (extend-env ids vals env)))) ;; Añado al eval-expression las variables locales.
+
+(define eval-rands (lambda (exps env) ;; Evaluación de rands (Revisar).
+(map (lambda (e) (eval-expression e env)) exps)))
 
 (define interpretador
   (lambda (cadena)
@@ -185,13 +194,17 @@
 
 ;; Pruebas.
 
-(define (probar nombre expresion-str esperado)
+(define (probar nombre expresion-str esperado) ;; Revisión de pruebas (revisar).
   (let ((obtenido (interpretador expresion-str)))
     (display " ") (display nombre) (display " =&gt; ") (display obtenido)
     (if (equal? obtenido esperado)
         (begin (display " [OK]") (newline))
         (begin (display " [FALLO - Esperado: ") (display esperado) (display "]") (newline)))))
 
-(display "=== Pruebas Punto 4: Condicionales ===") (newline)
+(display "=== Pruebas con condicional si-sino ===") (newline)
 (probar "Si verdadero" "Si (2+3) { 2 } sino { 3 }" 2)
 (probar "Si falso" "Si (longitud(@d) ~ 4) { 2 } sino { 3 }" 3)
+
+(display "=== Pruebas con variables locales ===") (newline) 
+(probar "declarar 1" "declarar (@x=2;@y=3;@a=7;){ (@a+(@x\~@y)) }" 6) 
+(probar "declarar 2" "declarar (@x=2;@y=3;@a=7;) { (@a+@b) }" 9)
