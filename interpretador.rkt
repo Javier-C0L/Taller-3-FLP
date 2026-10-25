@@ -50,6 +50,9 @@
     (primitive-unary ("add1") primitiva-add1)
     (primitive-unary ("sub1") primitiva-sub1)
     (primitive-unary ("neg") primitiva-negacion-booleana)
+
+    ;; 4) Condicional if: Si test { true-exp } sino { false-exp } 
+    (expression ("Si" expression "{" expression "}" "sino" "{" expression "}") condicional-exp)
   ))
 
 (sllgen:make-define-datatypes scanner-spec-interpreter grammar-interpreter)
@@ -146,3 +149,49 @@
       (primitiva-add1 () (+ val 1))
       (primitiva-sub1 () (- val 1))
       (primitiva-negacion-booleana () (if (valor-verdad? val) 0 1)))))
+
+  ;; Definición del eval-program.
+
+(define eval-program
+  (lambda (pgm)
+    (cases program pgm
+      (un-programa (exp)
+        (eval-expression exp (init-env))))))
+
+(define eval-expression
+  (lambda (exp env)
+    (cases expression exp
+      (numero-lit (num) num)
+      (texto-lit (txt) txt)
+      (var-exp (id) (buscar-variable env id))
+
+      (primapp-bin-exp (exp1 prim exp2)
+        (let ((val1 (eval-expression exp1 env))
+              (val2 (eval-expression exp2 env)))
+          (apply-primitive-binary prim val1 val2)))
+
+      (primapp-un-exp (prim exp1)
+        (let ((val (eval-expression exp1 env)))
+          (apply-primitive-unary prim val)))
+
+      (condicional-exp (test-exp true-exp false-exp)
+        (if (valor-verdad? (eval-expression test-exp env))
+            (eval-expression true-exp env)
+            (eval-expression false-exp env))))))
+
+(define interpretador
+  (lambda (cadena)
+    (eval-program (scan&parse cadena))))
+
+;; Pruebas.
+
+(define (probar nombre expresion-str esperado)
+  (let ((obtenido (interpretador expresion-str)))
+    (display " ") (display nombre) (display " =&gt; ") (display obtenido)
+    (if (equal? obtenido esperado)
+        (begin (display " [OK]") (newline))
+        (begin (display " [FALLO - Esperado: ") (display esperado) (display "]") (newline)))))
+
+(display "=== Pruebas Punto 4: Condicionales ===") (newline)
+(probar "Si verdadero" "Si (2+3) { 2 } sino { 3 }" 2)
+(probar "Si falso" "Si (longitud(@d) ~ 4) { 2 } sino { 3 }" 3)
