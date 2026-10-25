@@ -45,18 +45,24 @@
     (primitive-binary ("!=") primitiva-diferente)
     (primitive-binary ("==") primitiva-comparador-igual)
 
-    ;; Primitivas unarias basicas
+    ;; Primitivas unarias básicas
     (primitive-unary ("longitud") primitiva-longitud)
     (primitive-unary ("add1") primitiva-add1)
     (primitive-unary ("sub1") primitiva-sub1)
     (primitive-unary ("neg") primitiva-negacion-booleana)
 
-    ;; Condicional if: Si test { true-exp } sino { false-exp } 
+    ;; Condicional if. Si test { true-exp } sino { false-exp } 
     (expression ("Si" expression "{" expression "}" "sino" "{" expression "}") condicional-exp)
   ))
 
     ;; Variables locales. declarar ( @x=2; @y=3; ) { cuerpo }
-(expression ("declarar" "(" (separated-list identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
+    (expression ("declarar" "(" (separated-list identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
+
+    ;; Creación procedimientos. procedimiento (@x, @y) { cuerpo }
+    (expression ("procedimiento" "(" (separated-list identifier ",") ")" "{" expression "}") procedimiento-ex)
+
+    ;; Evaluación procedimientos. evaluar @proc (arg1, arg2) finEval
+    (expression ("evaluar" expression "(" (separated-list expression ",") ")" "finEval") app-exp)
 
 (sllgen:make-define-datatypes scanner-spec-interpreter grammar-interpreter)
 
@@ -153,6 +159,21 @@
       (primitiva-sub1 () (- val 1))
       (primitiva-negacion-booleana () (if (valor-verdad? val) 0 1)))))
 
+(define-datatype procVal procVal? 
+(cerradura 
+  (lista-ID (list-of symbol?))
+  (exp expression?)
+  (amb ambiente?)))
+
+(define apply-procedure
+  (lambda (proc args)
+    (cases procVal proc
+      (cerradura (ids cuerpo amb-guardado)
+        (if (= (length ids) (length args)) 
+        (eval-expression cuerpo (extend-env ids args amb-guardado))
+        (eopl:error 'apply-procedure "Numero incorrecto de argumentos: se esperaban \~s, se recibieron \~s" 
+                    (length ids) (length args)))))))
+
   ;; Definición del eval-program.
 
 (define eval-program
@@ -185,6 +206,16 @@
       (variableLocal-exp (ids exps cuerpo) (let ((vals (eval-rands exps env)))
       (eval-expression cuerpo (extend-env ids vals env)))) ;; Añado al eval-expression las variables locales.
 
+      (procedimiento-ex (ids cuerpo) 
+        (cerradura ids cuerpo env))
+
+      (app-exp (exp exps)
+        (let ((proc (eval-expression exp env)) 
+              (args (eval-rands exps env)))
+          (if (procVal? proc)
+              (apply-procedure proc args) 
+              (eopl:error 'eval-expression "El valor no es un procedimiento valido: \~s" proc)))))))
+
 (define eval-rands (lambda (exps env) ;; Evaluación de rands (Revisar).
 (map (lambda (e) (eval-expression e env)) exps)))
 
@@ -208,3 +239,11 @@
 (display "=== Pruebas con variables locales ===") (newline) 
 (probar "declarar 1" "declarar (@x=2;@y=3;@a=7;){ (@a+(@x\~@y)) }" 6) 
 (probar "declarar 2" "declarar (@x=2;@y=3;@a=7;) { (@a+@b) }" 9)
+
+(display "=== Procedimientos (procedimiento / evaluar) ===") (newline)
+(probar "Procedimiento simple" 
+"declarar (@x=2; @y=3; @a=procedimiento (@x,@y,@z) { ((@x+@y)+@z) } ;) { evaluar @a (1,2,@x) finEval }" 
+5)
+(probar "Procedimientos anidados" 
+"declarar (@x=procedimiento (@a,@b) { ((@a\*@a) + (@b\*@b)) }; @y=procedimiento (@x,@y) { (@x+@y) } ;) { (evaluar @x(1,2) finEval + evaluar @y(2,3) finEval) }" 
+10)
