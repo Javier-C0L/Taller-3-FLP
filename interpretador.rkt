@@ -31,6 +31,15 @@
     (expression ("(" expression primitive-binary expression ")") primapp-bin-exp)
     (expression (primitive-unary "(" expression ")") primapp-un-exp)
 
+    ;; Variables locales. declarar ( @x=2; @y=3; ) { cuerpo }
+    (expression ("declarar" "(" (separated-list identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
+
+    ;; Creación procedimientos. procedimiento (@x, @y) { cuerpo }
+    (expression ("procedimiento" "(" (separated-list identifier ",") ")" "{" expression "}") procedimiento-ex)
+
+    ;; Evaluación procedimientos. evaluar @proc (arg1, arg2) finEval
+    (expression ("evaluar" expression "(" (separated-list expression ",") ")" "finEval") app-exp)
+
     ;; Primitivas binarias basicas
     (primitive-binary ("+") primitiva-suma)
     (primitive-binary ("~") primitiva-resta)
@@ -45,11 +54,14 @@
     (primitive-binary ("!=") primitiva-diferente)
     (primitive-binary ("==") primitiva-comparador-igual)
 
-    ;; Primitivas unarias basicas
+    ;; Primitivas unarias básicas
     (primitive-unary ("longitud") primitiva-longitud)
     (primitive-unary ("add1") primitiva-add1)
     (primitive-unary ("sub1") primitiva-sub1)
     (primitive-unary ("neg") primitiva-negacion-booleana)
+
+    ;; Condicional if. Si test { true-exp } sino { false-exp } 
+    (expression ("Si" expression "{" expression "}" "sino" "{" expression "}") condicional-exp)
   ))
 
 (sllgen:make-define-datatypes scanner-spec-interpreter grammar-interpreter)
@@ -146,3 +158,94 @@
       (primitiva-add1 () (+ val 1))
       (primitiva-sub1 () (- val 1))
       (primitiva-negacion-booleana () (if (valor-verdad? val) 0 1)))))
+
+(define-datatype procVal procVal? 
+(cerradura 
+  (lista-ID (list-of symbol?))
+  (exp expression?)
+  (amb ambiente?)))
+
+(define apply-procedure
+  (lambda (proc args)
+    (cases procVal proc
+      (cerradura (ids cuerpo amb-guardado)
+        (if (= (length ids) (length args)) 
+        (eval-expression cuerpo (extend-env ids args amb-guardado))
+        (eopl:error 'apply-procedure "Numero incorrecto de argumentos: se esperaban ~s, se recibieron ~s" 
+                    (length ids) (length args)))))))
+
+  ;; Definición del eval-program.
+
+(define eval-program
+  (lambda (pgm)
+    (cases program pgm
+      (un-programa (exp)
+        (eval-expression exp (init-env))))))
+
+(define eval-expression
+  (lambda (exp env)
+    (cases expression exp
+      (numero-lit (num) num)
+      (texto-lit (txt) txt)
+      (var-exp (id) (buscar-variable env id))
+
+      (primapp-bin-exp (exp1 prim exp2)
+        (let ((val1 (eval-expression exp1 env))
+              (val2 (eval-expression exp2 env)))
+          (apply-primitive-binary prim val1 val2)))
+
+      (primapp-un-exp (prim exp1)
+        (let ((val (eval-expression exp1 env)))
+          (apply-primitive-unary prim val)))
+
+      (condicional-exp (test-exp true-exp false-exp)
+        (if (valor-verdad? (eval-expression test-exp env))
+            (eval-expression true-exp env)
+            (eval-expression false-exp env)))
+
+       ;; Condicional if (Revisar).
+
+      (variableLocal-exp (ids exps cuerpo) (let ((vals (eval-rands exps env)))
+      (eval-expression cuerpo (extend-env ids vals env)))) ;; Añado al eval-expression las variables locales.
+
+      (procedimiento-ex (ids cuerpo) 
+        (cerradura ids cuerpo env))
+
+      (app-exp (exp exps)
+        (let ((proc (eval-expression exp env)) 
+              (args (eval-rands exps env)))
+          (if (procVal? proc)
+              (apply-procedure proc args) 
+              (eopl:error 'eval-expression "El valor no es un procedimiento valido: ~s" proc)))))))
+
+(define eval-rands (lambda (exps env) ;; Evaluación de rands (Revisar).
+(map (lambda (e) (eval-expression e env)) exps)))
+
+(define interpretador
+  (lambda (cadena)
+    (eval-program (scan&parse cadena))))
+
+;; Pruebas.
+
+(define (probar nombre expresion-str esperado) ;; Revisión de pruebas (revisar).
+  (let ((obtenido (interpretador expresion-str)))
+    (display " ") (display nombre) (display " =&gt; ") (display obtenido)
+    (if (equal? obtenido esperado)
+        (begin (display " [OK]") (newline))
+        (begin (display " [FALLO - Esperado: ") (display esperado) (display "]") (newline)))))
+
+(display "=== Pruebas con condicional si-sino ===") (newline)
+(probar "Si verdadero" "Si (2+3) { 2 } sino { 3 }" 2)
+(probar "Si falso" "Si (longitud(@d) ~ 4) { 2 } sino { 3 }" 3)
+
+(display "=== Pruebas con variables locales ===") (newline) 
+(probar "declarar 1" "declarar (@x=2;@y=3;@a=7;){ (@a+(@x~@y)) }" 6) 
+(probar "declarar 2" "declarar (@x=2;@y=3;@a=7;) { (@a+@b) }" 9)
+
+(display "=== Procedimientos (procedimiento / evaluar) ===") (newline)
+(probar "Procedimiento simple" 
+"declarar (@x=2; @y=3; @a=procedimiento (@x,@y,@z) { ((@x+@y)+@z) } ;) { evaluar @a (1,2,@x) finEval }" 
+5)
+(probar "Procedimientos anidados" 
+"declarar (@x=procedimiento (@a,@b) { ((@a*@a) + (@b*@b)) }; @y=procedimiento (@x,@y) { (@x+@y) } ;) { (evaluar @x(1,2) finEval + evaluar @y(2,3) finEval) }" 
+10)
