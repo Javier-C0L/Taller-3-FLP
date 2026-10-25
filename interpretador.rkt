@@ -32,7 +32,7 @@
     (expression (primitive-unary "(" expression ")") primapp-un-exp)
 
     ;; Variables locales. declarar ( @x=2; @y=3; ) { cuerpo }
-    (expression ("declarar" "(" (separated-list identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
+    (expression ("declarar" "(" (arbno identifier "=" expression ";") ")" "{" expression "}") variableLocal-exp)
 
     ;; Creación procedimientos. procedimiento (@x, @y) { cuerpo }
     (expression ("procedimiento" "(" (separated-list identifier ",") ")" "{" expression "}") procedimiento-ex)
