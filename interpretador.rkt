@@ -82,12 +82,12 @@
   (extendido
    (syms (list-of symbol?))
    (vals (list-of scheme-value?))
-   (amb-padre ambiente?)))
+   (amb-padre ambiente?)) 
   (extendido-recursivo ;; ambiente que soporta funciones recursivas
     (proc-names (list-of symbol?)) 
     (idss (list-of (list-of symbol?))) 
     (cuerpos (list-of expression?)) 
-    (amb-padre ambiente?))) 
+    (amb-padre ambiente?)))
 
 (define empty-env
   (lambda () (vacio)))
@@ -127,14 +127,14 @@
         (let ((pos (list-find-position search-var syms)))
           (if (number? pos)
               (list-ref vals pos)
-              (buscar-variable amb-padre search-var)))))))
+              (buscar-variable amb-padre search-var))))))
       (extendido-recursivo (proc-names idss cuerpos amb-padre) 
         (let ((pos (list-find-position search-var proc-names))) 
           (if (number? pos) 
               (cerradura (list-ref idss pos) 
                           (list-ref cuerpos pos) 
                           env) 
-              (buscar-variable amb-padre search-var)))))))
+              (buscar-variable amb-padre search-var)))))
 
 (define APPLY-ENV buscar-variable)
 
@@ -244,7 +244,7 @@
   (lambda (cadena)
     (eval-program (scan&parse cadena))))
 
-;; Pruebas.
+;; 4. Programas en el Lenguaje y Pruebas Automatizadas
 
 (define (probar nombre expresion-str esperado) ;; Revisión de pruebas (revisar)
   (let ((obtenido (interpretador expresion-str)))
@@ -268,3 +268,50 @@
 (probar "Procedimientos anidados" 
 "declarar (@x=procedimiento (@a,@b) { ((@a*@a) + (@b*@b)) }; @y=procedimiento (@x,@y) { (@x+@y) } ;) { (evaluar @x(1,2) finEval + evaluar @y(2,3) finEval) }" 
 10)
+
+
+(define prog-9a "declararRec ( 
+  @sumarDigitos (@n) = Si (@n &lt; 10) { @n } sino { ((@n % 10) + evaluar @sumarDigitos((@n / 10)) finEval) } ; ) { 
+  evaluar @sumarDigitos(147) finEval }"
+)
+
+(define prog-9b-1 "declararRec ( 
+  @sumaNaturales (@n) = Si (@n == 0) { 0 } sino { (@n + evaluar @sumaNaturales((@n ~ 1)) finEval) } ; ) { 
+  evaluar @sumaNaturales(5) finEval }"
+)
+
+(define prog-9b-2 "declararRec ( 
+  @sumaNaturales (@n) = Si (@n == 0) { 0 } sino { (@n + evaluar @sumaNaturales((@n ~ 1)) finEval) } ; ) { 
+  evaluar @sumaNaturales(10) finEval }"
+)
+
+(define prog-9c "declararRec ( 
+  @multiplicar (@a, @b) = Si (@b == 0) { 0 } sino { (@a + evaluar @multiplicar(@a, (@b ~ 1)) finEval) } ; ) { 
+  evaluar @multiplicar(4, 3) finEval }"
+)
+
+(define prog-9d "declararRec ( 
+  @sumaParesRango (@a, @b) = Si (@a &gt; @b) { 0 } sino { (Si ((@a % 2) == 0) { @a } sino { 0 } + evaluar @sumaParesRango((@a + 1), @b) finEval) } ; ) { 
+  evaluar @sumaParesRango(2, 7) finEval }"
+)
+
+(define prog-9e "declarar ( 
+  @integrantes = procedimiento () { \\"Maria\_Jhonnier\_Javier\\" } ; @saludar = procedimiento (@f) { procedimiento () { (\\"Hola:\\" concat evaluar @f () finEval) } } ; @decorate = evaluar @saludar (@integrantes) finEval ; ) { 
+  evaluar @decorate () finEval }"
+)
+
+(define prog-9f "declarar ( 
+  @integrantes = procedimiento () { \\"Maria\_Jhonnier\_Javier\\" } ; @saludar = procedimiento (@f) { procedimiento (@mensaje) { ((\\"Hola:\\" concat evaluar @f () finEval) concat @mensaje) } } ; @decorate = evaluar @saludar (@integrantes) finEval ; ) { 
+  evaluar @decorate (\\"\_ProfesoresFLP\\") finEval }"
+)
+
+;; Verificacion de pruebas -9.
+
+(titulo "Pruebas Punto 9: Programas y Decoradores") 
+(probar "9a. sumarDigitos(147)" prog-9a 12) 
+(probar "9b. sumaNaturales(5)" prog-9b-1 15) 
+(probar "9b. sumaNaturales(10)" prog-9b-2 55) 
+(probar "9c. multiplicar(4, 3)" prog-9c 12) 
+(probar "9d. sumaParesRango(2, 7)" prog-9d 12) 
+(probar "9e. Decorador simple" prog-9e "Hola:Maria_Jhonnier_Javier") 
+(probar "9f. Decorador con parametro" prog-9f "Hola:Maria_Jhonnier_Javier_ProfesoresFLP")
