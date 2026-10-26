@@ -83,6 +83,11 @@
    (syms (list-of symbol?))
    (vals (list-of scheme-value?))
    (amb-padre ambiente?)))
+  (extendido-recursivo ;; ambiente que soporta funciones recursivas
+    (proc-names (list-of symbol?)) 
+    (idss (list-of (list-of symbol?))) 
+    (cuerpos (list-of expression?)) 
+    (amb-padre ambiente?))) 
 
 (define empty-env
   (lambda () (vacio)))
@@ -90,6 +95,10 @@
 (define extend-env
   (lambda (syms vals amb)
     (extendido syms vals amb)))
+
+(define extend-env-recursively 
+  (lambda (proc-names idss cuerpos amb) 
+    (extendido-recursivo proc-names idss cuerpos amb)))
 
 (define init-env
   (lambda ()
@@ -118,6 +127,13 @@
         (let ((pos (list-find-position search-var syms)))
           (if (number? pos)
               (list-ref vals pos)
+              (buscar-variable amb-padre search-var)))))))
+      (extendido-recursivo (proc-names idss cuerpos amb-padre) 
+        (let ((pos (list-find-position search-var proc-names))) 
+          (if (number? pos) 
+              (cerradura (list-ref idss pos) 
+                          (list-ref cuerpos pos) 
+                          env) 
               (buscar-variable amb-padre search-var)))))))
 
 (define APPLY-ENV buscar-variable)
@@ -206,7 +222,10 @@
        ;; Condicional if (Revisar).
 
       (variableLocal-exp (ids exps cuerpo) (let ((vals (eval-rands exps env)))
-      (eval-expression cuerpo (extend-env ids vals env)))) ;; Añado al eval-expression las variables locales.
+      (eval-expression cuerpo (extend-env ids vals env)))) 
+
+      (variableLocalRec-exp (proc-names idss cuerpos cuerpo) 
+       (eval-expression cuerpo (extend-env-recursively proc-names idss cuerpos env)))
 
       (procedimiento-ex (ids cuerpo) 
         (cerradura ids cuerpo env))
@@ -218,7 +237,7 @@
               (apply-procedure proc args) 
               (eopl:error 'eval-expression "El valor no es un procedimiento valido: ~s" proc)))))))
 
-(define eval-rands (lambda (exps env) ;; Evaluación de rands (Revisar).
+(define eval-rands (lambda (exps env) ;; Evaluación de rands (Revisar)
 (map (lambda (e) (eval-expression e env)) exps)))
 
 (define interpretador
@@ -227,7 +246,7 @@
 
 ;; Pruebas.
 
-(define (probar nombre expresion-str esperado) ;; Revisión de pruebas (revisar).
+(define (probar nombre expresion-str esperado) ;; Revisión de pruebas (revisar)
   (let ((obtenido (interpretador expresion-str)))
     (display " ") (display nombre) (display " =&gt; ") (display obtenido)
     (if (equal? obtenido esperado)
